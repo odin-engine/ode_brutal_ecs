@@ -1,7 +1,7 @@
 ![alt text](/img/banner.png?raw=true)
 # 👊 Be a savage, use brutal ECS
 
-One problem with modern [ECS](/docs/what_is_ecs.md) libraries is the excessive _overhead_ for the sake of comfort of programmers. They might have a nice query API that can do magic for you, but I'd rather sacrifice comfort for raw execution speed and transparency in what's happening. 
+One problem with modern [ECS](/docs/what_is_ecs.md) libraries is the excessive _overhead_ for the sake of comfort of programmers. They might have a nice query API that can do magic for you, but I'd rather sacrifice comfort for raw execution speed and transparency. 
 
 ODE_BRUTAL_ECS is a manual, pure archetype-based, stripped-down version of [ODE_ECS](https://github.com/odin-engine/ode_ecs). No queries or views, no tags. [You do stuff manually](/docs/do_manually.md), but in return you get extreme speed, full control, and clarity in what's happening.
 
