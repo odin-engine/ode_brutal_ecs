@@ -5,7 +5,7 @@ One problem with modern [ECS](/docs/what_is_ecs.md) libraries is the excessive _
 
 ODE_BRUTAL_ECS is a manual, pure archetype-based, stripped-down version of [ODE_ECS](https://github.com/odin-engine/ode_ecs). No queries or views, no tags. [You do stuff manually](/docs/do_manually.md), but in return you get extreme speed, full control, and clarity in what's happening.
 
-_The main idea: sacrifice the comfort of programmers for raw speed and clarity._
+_The main idea: sacrifice a little bit of the comfort (debatable) of programmers for raw speed and clarity._
 
 #### Brutal high-performance
 - Extremely fast.
