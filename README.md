@@ -58,6 +58,8 @@ _The main idea: sacrifice the comfort of programmers for raw speed and clarity._
     }
 ```
 
+See the [API reference](/docs/api.md) for more details.
+
 # How to install
 
 Use `git clone` to clone this repository into your project folder, and then `import ecs "ode_brutal_ecs/src"`: 
