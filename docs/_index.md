@@ -3,9 +3,10 @@
 * [README.md](/README.md)
 
 Main:
-* [API Reference](api.md)
 * [Database](database.md)
 * [Table (Archetype Table)](table.md)
+* [API Reference](api.md)
+* [How to do stuff manually](do_manually.md)
 
 Optional:
 * [Relations](relations.md)
