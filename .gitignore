@@ -1,0 +1,39 @@
+# Ignore temp
+temp/
+temp/*.*
+
+# Ignore  .md files 
+*.md
+
+# Allow the README.md file 
+!/README.md
+!docs/*.md
+
+out/*
+!out/.keep
+
+src/out/*
+!src/out/.keep
+
+tests/out/*
+!tests/out/.keep
+
+samples/**/out/*
+!samples/**/out/.keep
+
+ols.json
+*.code-workspace
+
+src/ode_core/out/*
+!src/ode_core/out/.keep
+
+benchmarks/out/*
+!benchmarks/out/.keep
+
+#fuzz/out/*
+#!fuzz/out/.keep
+fuzz
+*-autosave.kra
+*.kra~
+*.snap
+*.png~

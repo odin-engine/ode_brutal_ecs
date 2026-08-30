@@ -1,0 +1,140 @@
+/*
+    2026 (c) Zaya, https://github.com/zm69
+
+    Overbase example.
+
+    Overbase is a shareable entity ID space: one or more Databases can attach
+    to the same Overbase (instead of each owning its own) so that the same
+    entity_id refers to the same logical entity across all of them, while each
+    Database still keeps its own independent set of component tables/views.
+
+    Here, world_ecs (gameplay: Position/Velocity) and render_ecs (Sprite) share
+    one Overbase. Entity lifecycle is fully owned by Overbase: destroying an
+    entity through either Database removes its components from BOTH before the
+    id is freed for reuse — a recycled index never resurfaces stale data in a
+    Database that wasn't told the old entity died. See docs/overbase.md.
+*/
+
+package ode_ecs_sample05
+
+// Core
+    import "core:fmt"
+    import "core:log"
+    import "core:mem"
+
+// ODE_BRUTAL_ECS
+    import ecs "../../src"
+    import oc "../../src/ode_core"
+
+//
+// Components
+//
+
+    Position :: struct { x, y: f32 }
+    Velocity :: struct { dx, dy: f32 }
+    Sprite   :: struct { texture_id: int }
+
+main :: proc() {
+
+    //
+    // OPTIONAL: Setup memory tracking and logger.
+    //
+        mem_track: oc.Mem_Track
+
+        context.allocator = oc.mem_track__init(&mem_track, context.allocator)
+        defer oc.mem_track__terminate(&mem_track)
+        defer oc.mem_track__panic_if_bad_frees_or_leaks(&mem_track) // Defers run in reverse declaration order
+
+        context.logger = log.create_console_logger()
+        defer log.destroy_console_logger(context.logger)
+
+        // Panic allocator ensures no allocations happen outside the provided allocator
+        allocator := context.allocator
+        context.allocator = mem.panic_allocator()
+
+    //
+    // Actual ODE_BRUTAL_ECS sample starts here.
+    //
+        err: ecs.Error
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // One shared Overbase (databases_cap = max number of Databases that will
+    // attach to it — preallocated, like everything else in ODE_BRUTAL_ECS).
+    //
+        overbase: ecs.Overbase
+
+        // Databases must be terminated before the Overbase they share — defer
+        // the Overbase's termination FIRST so it runs LAST (defers are LIFO).
+        defer {
+            err = ecs.overbase_terminate(&overbase)
+            if err != nil do report_error(err)
+        }
+
+        err = ecs.overbase_init(&overbase, entities_cap=10, databases_cap=2, allocator=allocator)
+        if err != nil { report_error(err); return }
+
+        world_ecs, render_ecs: ecs.Database
+
+        defer {
+            err = ecs.terminate(&render_ecs)
+            if err != nil do report_error(err)
+        }
+        defer {
+            err = ecs.terminate(&world_ecs)
+            if err != nil do report_error(err)
+        }
+
+        // allocator omitted -> falls back to overbase's allocator
+        err = ecs.init_from_overbase(&world_ecs, &overbase)
+        if err != nil { report_error(err); return }
+        err = ecs.init_from_overbase(&render_ecs, &overbase)
+        if err != nil { report_error(err); return }
+
+        world: ecs.Table
+        err = ecs.table_init(&world, &world_ecs, 10, {Position, Velocity})
+        if err != nil { report_error(err); return }
+
+        sprites: ecs.Table
+        err = ecs.table_init(&sprites, &render_ecs, 10, {Sprite})
+        if err != nil { report_error(err); return }
+
+    ///////////////////////////////////////////////////////////////////////////////
+        robot, cerr := ecs.create_entity(&overbase)
+        if cerr != nil { report_error(cerr); return }
+
+        err = ecs.add_entity(&world, robot)
+        if err != nil { report_error(err); return }
+        ecs.set_component(&world, robot, Position{ 10, 20 })
+        ecs.set_component(&world, robot, Velocity{ 1, 0 })
+
+        err = ecs.add_entity(&sprites, robot)
+        if err != nil { report_error(err); return }
+        ecs.set_component(&sprites, robot, Sprite{ texture_id = 42 })
+
+        fmt.println("robot:", robot)
+        fmt.println("  known to world_ecs: ", ecs.is_expired(&world_ecs, robot) == false)
+        fmt.println("  known to render_ecs:", ecs.is_expired(&render_ecs, robot) == false)
+        fmt.println("  Position:", ecs.get_component(&world, robot, Position)^)
+        fmt.println("  Sprite:  ", ecs.get_component(&sprites, robot, Sprite)^)
+
+    ///////////////////////////////////////////////////////////////////////////////
+    // Destroy through world_ecs only — the shared Overbase still cleans up
+    // render_ecs's Sprite for the same entity, so a recycled index never
+    // resurfaces stale render data on a future entity.
+    //
+        err = ecs.destroy_entity(&world_ecs, robot)
+        if err != nil { report_error(err); return }
+
+        fmt.println()
+        fmt.println("After destroy_entity(&world_ecs, robot):")
+        fmt.println("  expired in world_ecs: ", ecs.is_expired(&world_ecs, robot))
+        fmt.println("  expired in render_ecs:", ecs.is_expired(&render_ecs, robot))
+        fmt.println("  render_ecs still has Sprite for robot:", ecs.has_component(&sprites, robot))
+
+        fmt.println()
+        fmt.println("Total memory usage:", ecs.memory_usage(&world_ecs) + ecs.memory_usage(&render_ecs), "bytes")
+}
+
+report_error :: proc (err: ecs.Error, loc := #caller_location) {
+    log.error("Error:", err, location = loc)
+}

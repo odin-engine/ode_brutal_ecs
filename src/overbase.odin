@@ -1,0 +1,162 @@
+/*
+    2026 (c) Zaya, https://github.com/zm69
+*/
+package ode_ecs
+
+// Base
+    import "base:runtime"
+
+// ODE
+    import oc "ode_core"
+
+///////////////////////////////////////////////////////////////////////////////
+// Overbase
+
+    Overbase :: struct {
+        allocator: runtime.Allocator,
+        state: Object_State,
+
+        id_factory: oc.Ix_Gen_Factory,
+
+        // Databases currently attached to this Overbase (own or shared),
+        // notified in database__destroy_entity_local order when an entity dies.
+        databases: oc.Dense_Arr(^Database),
+
+        primary_database: ^Database,
+    }
+
+    overbase__is_valid :: proc(self: ^Overbase) -> bool {
+        if self == nil do return false
+        if self.state != Object_State.Normal do return false
+        if !oc.ix_gen_factory__is_valid(&self.id_factory) do return false
+        if !oc.dense_arr__is_valid(&self.databases) do return false
+
+        return true
+    }
+
+    overbase__init :: proc(self: ^Overbase, entities_cap: u32, databases_cap := 1, allocator := context.allocator) -> Error {
+        when VALIDATIONS {
+            assert(self != nil)
+            assert(self.state == Object_State.Not_Initialized)
+        }
+
+        if entities_cap == 0 do return API_Error.Entities_Cap_Should_Be_Greater_Than_Zero
+
+        self.allocator = allocator
+
+        oc.ix_gen_factory__init(&self.id_factory, int(entities_cap), self.allocator) or_return
+        oc.dense_arr__init(&self.databases, databases_cap, self.allocator) or_return
+
+        self.state = Object_State.Normal
+
+        assert(overbase__is_valid(self))
+
+        return nil
+    }
+
+    overbase__terminate :: proc(self: ^Overbase) -> Error {
+        when VALIDATIONS {
+            assert(self != nil)
+            // Every Database attached to this Overbase must be terminated
+            // (which detaches it) before the Overbase itself is terminated.
+            assert(oc.dense_arr__len(&self.databases) == 0)
+        }
+
+        oc.dense_arr__terminate(&self.databases, self.allocator) or_return
+        oc.ix_gen_factory__terminate(&self.id_factory, self.allocator) or_return
+
+        self.state = Object_State.Not_Initialized
+        return nil
+    }
+
+    @(require_results)
+    overbase__create_entity :: proc(self: ^Overbase) -> (entity_id, Error) {
+        when VALIDATIONS {
+            assert(self != nil)
+        }
+
+        return oc.ix_gen_factory__new_id(&self.id_factory)
+    }
+
+    overbase__destroy_entity :: #force_inline proc(self: ^Overbase, eid: entity_id, destroy_children := false) -> Error {
+        return overbase__destroy_entity_impl(self, eid, destroy_children, tolerate_expired = false)
+    }
+
+    @(require_results)
+    overbase__get_entity :: #force_inline proc "contextless" (self: ^Overbase, #any_int index: int, loc := #caller_location) -> entity_id {
+        return oc.ix_gen_factory__get_id(&self.id_factory, index, loc)
+    }
+
+    @(require_results)
+    overbase__entities_len :: #force_inline proc "contextless" (self: ^Overbase) -> int {
+        return oc.ix_gen_factory__len(&self.id_factory)
+    }
+
+    @(require_results)
+    overbase__is_entity_expired :: #force_inline proc "contextless" (self: ^Overbase, eid: entity_id) -> bool {
+        return oc.ix_gen_factory__is_expired(&self.id_factory, eid)
+    }
+
+    overbase__memory_usage :: proc(self: ^Overbase) -> int {
+        total := size_of(self^)
+
+        total += oc.ix_gen_factory__memory_usage(&self.id_factory)
+        total += oc.dense_arr__memory_usage(&self.databases)
+
+        return total
+    }
+
+///////////////////////////////////////////////////////////////////////////////
+// Private
+
+    @(private)
+    overbase__destroy_entity_impl :: proc(self: ^Overbase, eid: entity_id, destroy_children: bool, tolerate_expired: bool) -> Error {
+        when VALIDATIONS {
+            assert(self != nil)
+            assert(eid.ix >= 0)
+        }
+
+        if cerr := overbase__is_entity_correct(self, eid); cerr != nil {
+            if tolerate_expired && cerr == API_Error.Entity_Id_Expired do return nil
+            return cerr
+        }
+
+        err: Error
+        if self.primary_database != nil {
+            // Fast path: exactly one Database attached — skip the Dense_Arr walk.
+            err = database__destroy_entity_local(self.primary_database, eid, destroy_children)
+        } else {
+            for db in self.databases.items {
+                derr := database__destroy_entity_local(db, eid, destroy_children)
+                if err == nil do err = derr
+            }
+        }
+
+        // Trusted variant: overbase__is_entity_correct above already proved
+        // eid is in-bounds and live against this same id_factory.
+        oc.ix_gen_factory__free_id_trusted(&self.id_factory, eid)
+
+        return err
+    }
+
+    @(private)
+    overbase__is_entity_correct :: #force_inline proc "contextless" (self: ^Overbase, eid: entity_id) -> Error {
+        if eid.ix < 0 || eid.ix >= self.id_factory.cap do return API_Error.Entity_Id_Out_of_Bounds
+        if overbase__is_entity_expired(self, eid) do return API_Error.Entity_Id_Expired
+        return nil
+    }
+
+    @(private)
+    overbase__attach_database :: proc(self: ^Overbase, db: ^Database) -> Error {
+        _, cerr := oc.dense_arr__add(&self.databases, db)
+        if cerr != oc.Core_Error.None do return cerr
+        self.primary_database = oc.dense_arr__len(&self.databases) == 1 ? db : nil
+        return nil
+    }
+
+    @(private)
+    overbase__detach_database :: proc(self: ^Overbase, db: ^Database) {
+        // Not_Found is fine: double-terminate protection
+        oc.dense_arr__remove_by_value(&self.databases, db)
+        self.primary_database = oc.dense_arr__len(&self.databases) == 1 ? self.databases.items[0] : nil
+    }
