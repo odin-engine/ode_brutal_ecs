@@ -1,7 +1,7 @@
 ![alt text](/img/banner.png?raw=true)
 # 👊 Be a savage, use brutal ECS
 
-ODE_BRUTAL_ECS is a minimal, manual, pure archetype-based, stripped-down version of [ODE_ECS](https://github.com/odin-engine/ode_ecs). No queries or views, no tags. [You do stuff manually](/docs/do_manually.md), but in return you get lean, highly performant and transparent ECS.
+ODE_BRUTAL_ECS is a minimal, manual, [pure archetype-based](/docs/ecs_types.md), stripped-down version of [ODE_ECS](https://github.com/odin-engine/ode_ecs). No queries or views, no tags. [You do stuff manually](/docs/do_manually.md), but in return you get lean, highly performant and transparent ECS.
 
 _The main idea: sacrifice a little bit of the comfort of programmers for raw speed and clarity._
 
