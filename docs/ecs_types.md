@@ -78,3 +78,5 @@ ODE_BRUTAL_ECS is purely **archetype**-shaped:
 * **One Table per entity:** an entity belongs to at most one `Table` at a time — there is no sparse-set/tag escape hatch. For flags, states, or tags, model each state as its own `Table` (with the same or a different component set) and move the entity between them; see [You do stuff manually](do_manually.md) for the pattern.
 
 Check out the benchmark comparison of these approaches [here](https://github.com/zm69/ecs_bench).
+
+If you want to learn more about ECS this [YouTube video](https://www.youtube.com/watch?v=xm4AQj5PHT4) is pretty good.
