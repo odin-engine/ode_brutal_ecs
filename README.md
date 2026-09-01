@@ -31,6 +31,9 @@ _The main idea: sacrifice a little bit of the comfort of programmers for raw spe
 ```Odin
     import ecs "ode_brutal_ecs/src"
 
+    // NOTE: In a real game, you don't usually separate position and velocity into
+    // separate components - usually you make your components pretty fat. This
+    // is just for example's sake.
     Position :: struct { x, y: f32 } 
     Velocity :: struct { vx, vy: f32 }
 
